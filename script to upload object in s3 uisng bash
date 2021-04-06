@@ -1,0 +1,19 @@
+#!/bin/bash
+source ${PWD}/environment.sh
+
+cd dumps/
+file=05Apr2021.zip
+bucket=backup-citus
+resource="/${bucket}/${file}"
+contentType="application/x-compressed-tar"
+dateValue=$(date +"%a, %d %b %Y %T %z")
+stringToSign="PUT\n\n${contentType}\n${dateValue}\n${resource}"
+# signature=echo -en ${stringToSign} | openssl sha1 -hmac ${S3_SECRET} -binary | base64
+signature=$(echo -en ${stringToSign} | openssl sha1 -hmac ${S3_SECRET} -binary | base64)
+
+curl -X PUT -T "${file}" \
+    -H "Host: ${bucket}.s3.amazonaws.com" \
+    -H "Date: ${dateValue}" \
+    -H "Content-Type: ${contentType}" \
+    -H "Authorization: AWS ${S3_KEY}:${signature}" \
+    https://${bucket}.s3.amazonaws.com/${file}
