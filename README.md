@@ -12,31 +12,6 @@ Radar HQ is an open-source Kubernetes UI by Skyhook, installed on OKE (Oracle Cl
 | Helm chart | `skyhook/radar` |
 | Namespace | `radar` |
 
----
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  OKE Cluster (Radar installed here)                      │
-│                                                          │
-│  ┌─────────────────────────────────────────────┐         │
-│  │  Radar Pod                                  │         │
-│  │                                             │         │
-│  │  /home/nonroot/.kube/config  (mounted)      │         │
-│  │  KUBECONFIG env var set                     │         │
-│  │                                             │         │
-│  │  Reads static tokens from kubeconfig        │         │
-│  │  Connects to all clusters directly          │         │
-│  └──────────┬──────────┬──────────┬────────────┘         │
-│             │          │          │                       │
-└─────────────┼──────────┼──────────┼───────────────────────┘
-              │          │          │
-         ┌────▼───┐ ┌────▼───┐ ┌────▼───┐
-         │ EKS 1  │ │ EKS 2  │ │ EKS N  │
-         │(token) │ │(token) │ │(token) │
-         └────────┘ └────────┘ └────────┘
-```
 
 ---
 
