@@ -218,31 +218,6 @@ aws configure --profile aws-newteam
 
 ---
 
-## Fix ArgoCD / KEDA Permission Warnings (Optional)
-
-If you see warnings about ArgoCD or KEDA access, run this on each EKS cluster:
-
-```bash
-kubectl apply -f - <<'EOF'
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: radar-viewer-extra
-rules:
-- apiGroups: ["argoproj.io"]
-  resources: ["applications"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["keda.sh"]
-  resources: ["scaledobjects", "scaledjobs"]
-  verbs: ["get", "list", "watch"]
-EOF
-
-kubectl create clusterrolebinding radar-viewer-extra-binding \
-  --clusterrole=radar-viewer-extra \
-  --serviceaccount=kube-system:radar-viewer
-```
-
----
 
 ## File Locations (on bastion)
 
