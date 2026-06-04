@@ -9,16 +9,7 @@
 
 ---
 
-## Step 1 — AWS Profiles (one-time)
-
-```bash
-aws configure --profile aws-sbx
-aws configure --profile aws-prd
-```
-
----
-
-## Step 2 — Install Radar (one-time)
+## Install Radar (one-time)
 
 ```bash
 kubectl config use-context context-cdcojlpzgja
@@ -29,44 +20,11 @@ helm install radar skyhook/radar \
   --set service.type=LoadBalancer \
   --set service.port=4013 \
   --set service.targetPort=9280
-kubectl -n radar get svc radar --watch   # wait for EXTERNAL-IP
 ```
 
 ---
 
-## Step 3 — Setup Script
-
-Script location: `/root/radar/setup-eks-clusters.sh`
-
-**Edit clusters here:**
-
-```bash
-SBX_CLUSTERS=(
-  "sbx-euw1-k8s-eks-apps eu-west-1 aws-sbx"
-)
-PRD_CLUSTERS=(
-  "prd-use1-k8s-eks-apps us-east-1 aws-prd"
-)
-OKE_CONTEXT="context-cdcojlpzgja"
-```
-
-Format: `"CLUSTER_NAME REGION AWS_PROFILE"`
-
-**Run:**
-
-```bash
-/root/radar/setup-eks-clusters.sh
-```
-
-**What it does:**
-1. Creates `radar-viewer` ServiceAccount + token on each EKS cluster
-2. Grants `view` + ArgoCD/KEDA read permissions
-3. Builds merged kubeconfig with static tokens
-4. Uploads it as Secret `radar-kubeconfig` to OKE
-
----
-
-## Step 4 — Patch Radar Deployment (first-time only)
+## Patch Deployment (first-time only)
 
 ```bash
 kubectl config use-context context-cdcojlpzgja
@@ -86,31 +44,62 @@ kubectl -n radar patch deployment radar --type=json -p='[
 
 ---
 
-## Step 5 — Verify
+## Setup Script
+
+Script: `/root/radar/setup-eks-clusters.sh`
+
+Creates `radar-admin` SA with `cluster-admin` role on EKS/OKE clusters. Uses existing static admin creds for AKS. Merges all into one kubeconfig and uploads to OKE as Secret.
+
+Edit the cluster arrays at the top of the script:
 
 ```bash
-kubectl -n radar get pods -w
-kubectl -n radar logs deployment/radar | head -50
-echo "http://$(kubectl -n radar get svc radar -o jsonpath='{.status.loadBalancer.ingress[0].ip}'):4013"
+# EKS — Format: "CLUSTER_NAME REGION AWS_PROFILE"
+EKS_CLUSTERS=(
+  "sbx-euw1-k8s-eks-apps eu-west-1 aws-sbx"
+  ...
+)
+
+# OKE — Format: "DISPLAY_NAME CLUSTER_OCID REGION"
+OKE_CLUSTERS=(
+  "oke-jeddah-prod ocid1.cluster.oc1... me-jeddah-1"
+)
+
+# AKS — Format: "DISPLAY_NAME SOURCE_CONTEXT KUBECONFIG_PATH"
+# SOURCE_CONTEXT must be the -admin context (static creds)
+AKS_CLUSTERS=(
+  "prd-uks-aks-main prd-uks-aks-main-admin /root/radar/kubeconfigs/prd-uks-aks-main.yaml"
+)
+
+# Bare metal / on-prem — Format: "DISPLAY_NAME SOURCE_CONTEXT KUBECONFIG_PATH"
+# Kubeconfig must have static credentials (token or client cert)
+BAREMETAL_CLUSTERS=(
+  "bm-dc1-prod kubernetes-admin /root/radar/kubeconfigs/bm-dc1-prod.yaml"
+)
+```
+
+Run:
+
+```bash
+/root/radar/setup-eks-clusters.sh
+kubectl -n radar rollout restart deployment radar
 ```
 
 ---
 
 ## Adding New Clusters
 
-1. Edit: `vi /root/radar/setup-eks-clusters.sh` — add a line
-2. Run: `/root/radar/setup-eks-clusters.sh`
-3. Restart: `kubectl -n radar rollout restart deployment radar`
+1. Edit `/root/radar/setup-eks-clusters.sh` — add a line to the appropriate array
+2. Run the script
+3. `kubectl -n radar rollout restart deployment radar`
 
----
+**Prerequisites by provider:**
 
-## Adding a New AWS Profile
-
-```bash
-aws configure --profile aws-newteam
-```
-
-Then use `"cluster-name region aws-newteam"` in the script.
+| Provider | Requirement |
+|----------|------------|
+| EKS | AWS profile configured (`aws configure --profile <name>`) |
+| OKE | OCI CLI configured on bastion |
+| AKS | Copy admin kubeconfig to `/root/radar/kubeconfigs/` — must use `-admin` context with static creds, not exec-based |
+| Bare metal | Copy kubeconfig with static credentials to `/root/radar/kubeconfigs/` |
 
 ---
 
@@ -118,8 +107,8 @@ Then use `"cluster-name region aws-newteam"` in the script.
 
 | Path | Purpose |
 |------|---------|
-| `/root/radar/setup-eks-clusters.sh` | Main setup script |
-| `/root/radar/kubeconfigs/` | Individual kubeconfig per cluster |
+| `/root/radar/setup-eks-clusters.sh` | Setup script |
+| `/root/radar/kubeconfigs/` | Individual kubeconfigs |
 | `/root/radar/merged-kubeconfig.yaml` | Merged kubeconfig (mounted in pod) |
 
 ---
@@ -127,8 +116,8 @@ Then use `"cluster-name region aws-newteam"` in the script.
 ## Troubleshooting
 
 ```bash
-kubectl -n radar describe pod -l app.kubernetes.io/name=radar     # pod issues
-kubectl -n radar logs deployment/radar                             # logs
-KUBECONFIG=/root/radar/merged-kubeconfig.yaml kubectl config get-contexts  # verify contexts
-KUBECONFIG=/root/radar/kubeconfigs/<cluster>.yaml kubectl get ns   # test a token
+kubectl -n radar logs deployment/radar
+kubectl -n radar top pod
+KUBECONFIG=/root/radar/merged-kubeconfig.yaml kubectl config get-contexts
+grep -c "exec:" /root/radar/merged-kubeconfig.yaml   # must be 0
 ```
