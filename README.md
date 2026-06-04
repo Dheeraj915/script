@@ -4,7 +4,7 @@
 |-----------|--------|
 | Radar runs on | OKE cluster (`context-cdcojlpzgja`) |
 | Bastion | `vm-oci-prod-jenkins-master` |
-| UI URL | `http://161.118.180.16:4013` |
+| UI URL | `[http://radar.sirionlabs.tech:4013/` |
 | Namespace | `radar` |
 
 ---
